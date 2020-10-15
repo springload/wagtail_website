@@ -5,6 +5,11 @@ const colorJson = require('color-json');
 const baseUrl = process.argv[2]; // use the first argument
 
 const testPaths = ['/'];
+const violationImpactsThatFail = ['serious', 'critical'];
+const rulesToDisable: string[] = [];
+
+// See docs at
+// https://www.npmjs.com/package/@axe-core/puppeteer
 
 (async () => {
     console.log(`Testing ${baseUrl}`);
@@ -20,39 +25,43 @@ const testPaths = ['/'];
         });
     }
     await page.setBypassCSP(true);
-    let hasSeriousViolations = false;
+    let hasViolationsThatFail = false;
 
     for (let i = 0; i < testPaths.length; i++) {
         const testPath = testPaths[i];
         const url = new URL(testPath, baseUrl).toString();
 
-        console.log(url);
+        console.log(`Testing URL: ${url}`);
         await page.goto(url);
-        const allResults = await new AxePuppeteer(page).analyze();
-        const seriousViolations = allResults.violations.filter(
-            (violation: any) => violation.impact === 'serious',
+        const allResults = await new AxePuppeteer(page)
+            .disableRules(rulesToDisable)
+            .analyze();
+        const failTestViolations = allResults.violations.filter(
+            (violation: any) =>
+                violationImpactsThatFail.includes(violation.impact),
         );
-        const otherViolations = allResults.violations.filter(
-            (violation: any) => violation.impact !== 'serious',
+        const warningTestViolations = allResults.violations.filter(
+            (violation: any) =>
+                violationImpactsThatFail.includes(violation.impact) === false,
         );
 
-        if (seriousViolations.length > 0 || otherViolations.length > 0) {
+        if (failTestViolations.length > 0 || warningTestViolations.length > 0) {
             console.log(`Testing ${url} found violations`);
         } else {
             console.log(`No violations at ${url}`);
         }
 
-        if (seriousViolations.length > 0) {
-            console.error(colorJson(seriousViolations));
+        if (failTestViolations.length > 0) {
+            console.error(colorJson(failTestViolations));
         }
 
-        if (otherViolations.length > 0) {
+        if (warningTestViolations.length > 0) {
             console.info('Other violations: ');
-            console.info(colorJson(otherViolations));
+            console.info(colorJson(warningTestViolations));
         }
 
-        if (seriousViolations.length > 0) {
-            hasSeriousViolations = true;
+        if (violationImpactsThatFail.length > 0) {
+            hasViolationsThatFail = true;
         }
 
         console.log('\n');
@@ -61,5 +70,5 @@ const testPaths = ['/'];
     await page.close();
     await browser.close();
 
-    process.exit(hasSeriousViolations ? 1 : 0);
+    process.exit(hasViolationsThatFail ? 1 : 0);
 })();
