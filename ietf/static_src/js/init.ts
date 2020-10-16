@@ -4,8 +4,8 @@ import Popper from 'popper.js';
 
 import 'bootstrap';
 
-window.$ = $;
-window.jQuery = $;
-window.Popper = Popper;
+(window as any).$ = $;
+(window as any).jQuery = $;
+(window as any).Popper = Popper;
 
 document.documentElement.classList.remove('no-js');

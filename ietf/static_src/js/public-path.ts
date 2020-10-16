@@ -9,4 +9,5 @@
  */
 
 // eslint-disable-next-line camelcase, no-undef
+// @ts-ignore
 __webpack_public_path__ = window.staticRoot;
