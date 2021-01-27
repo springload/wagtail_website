@@ -9,13 +9,14 @@ services:
             target: app-dev
         volumes:
             - ".:/app"
-        ports:
-            - "8001:8000"
         env_file:
             - docker/dev.env
         depends_on:
             - database
 
+    # this is needed only for development,
+    # because we mount the whole project directory here and
+    # it shadows the static folder.
     frontend:
         restart: on-failure
         build:
@@ -24,6 +25,17 @@ services:
             target: frontend
         volumes:
             - ".:/app"
+
+    httpd:
+        restart: on-failure
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+            target: httpd
+        depends_on:
+            - application
+        ports:
+            - "8001:8000"
 
     database:
         restart: on-failure

@@ -59,7 +59,7 @@ COPY --from=frontend /app/ /app/
 
 ARG VERSION=dev
 ENV APPLICATION_VERSION=${VERSION}
-ENV DJANGO_SETTINGS_MODULE ietf.settings.docker.hosting
+ENV DJANGO_SETTINGS_MODULE ietf.settings.docker.base
 ENV VERSION=${VERSION}
 ENV ENVIRONMENT unknown
 ENV PROJECT wagtail_website
@@ -68,6 +68,8 @@ USER www
 
 # AWS hosting stages
 FROM base as aws-app
+# aws-specific settings
+ENV DJANGO_SETTINGS_MODULE ietf.settings.docker.hosting
 
 # ssm-parent is needed for dynamic env-variable configuration on AWS.
 # It just reads encrypted secrets from AWS SSM Parameter Store and exposes them
@@ -79,6 +81,9 @@ CMD ["/usr/local/bin/gunicorn", "--config", "/app/docker/gunicorn.py", "ietf.wsg
 
 # base app (hosted elsewhere, not on AWS)
 FROM base as app
+USER root
+RUN DJANGO_SETTINGS_MODULE=ietf.settings.docker.base DATABASE_URL=postgres://stub APP_SECRET_KEY=stub python manage.py collectstatic --noinput
+USER www
 CMD ["/usr/local/bin/gunicorn", "--config", "/app/docker/gunicorn.py", "ietf.wsgi" ]
 
 # development stage
@@ -94,3 +99,13 @@ USER www
 # and then it runs the actual process
 ENTRYPOINT ["wait-for", "database:5432", "--"]
 CMD ["/usr/local/bin/gunicorn", "--config", "/app/docker/gunicorn.py", "--reload", "ietf.wsgi" ]
+
+# nginx httpd server to host static files and proxy requests to the backend
+FROM nginx:stable-alpine as httpd
+
+RUN apk update && apk add --no-cache ca-certificates
+
+ADD docker/httpd/nginx.conf /etc/nginx/nginx.conf
+ADD docker/httpd/vhost.conf /etc/nginx/conf.d/default.conf
+
+COPY --from=app /app/static /app/static/
